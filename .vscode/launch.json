@@ -35,6 +35,20 @@
       "args": [],
       "cwd": "/Users/zzg/Desktop/rtos/Middlewares/Third_Party/FreeRTOS/Source",
       "program": "/Users/zzg/Desktop/rtos/Middlewares/Third_Party/FreeRTOS/Source/build/Debug/outDebug"
-    }
+    },
+    {
+      "name": "STM32 debug jlink",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "./build/rtos.elf",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/local/bin/arm-none-eabi-gdb",
+      "miDebuggerServerAddress": "localhost:2331"
+    },
   ]
 }
