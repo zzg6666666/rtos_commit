@@ -13,6 +13,8 @@ static HANDLE_LOG_FIFO log_fifo_handle;
 static uint8_t uart_fifo_put(const void *data, const uint16_t dataLen);
 // 初始化FIFO
 static void uart_printf_init();
+// 初始化uart硬件
+static void uart_hardware_init();
 // 从fifo出数据
 static uint8_t uart_fifo_get(uint8_t *data, const uint16_t dataLen);
 // 格式转换
@@ -183,6 +185,8 @@ uint8_t uart_printf(const void *strData, const uint8_t *data, const uint8_t len)
     if (initUartPrintf == 0)
     {
         initUartPrintf = 1;
+
+        uart_hardware_init();
         uart_printf_init();
     }
 
@@ -220,7 +224,7 @@ uint8_t uart_printf(const void *strData, const uint8_t *data, const uint8_t len)
     {
         uart_fifo_put(strData, strlen((char *)strData));
     }
-
+#if uart_IT
     // 使能串口中断
     if (log_fifo_handle.uart_error_code == UART_TX_READY)
     {
@@ -228,6 +232,21 @@ uint8_t uart_printf(const void *strData, const uint8_t *data, const uint8_t len)
         ENABLE_UART_TX_DR_IT();
         log_fifo_handle.uart_error_code = UART_TX_BUSY;
     }
+#else
+    // USART1_SR寄存器
+    uint32_t *USART1_SR = (uint32_t *)0x40013800;
+    // USART1_DR寄存器
+    uint32_t *USART1_DR = (uint32_t *)0x40013804;
+    uint8_t temp = 0;
+    while (uart_fifo_get(&temp, 1) != FIFO_OUT_FAIL)
+    {
+        while ((*USART1_SR & (1U << 7)) == 0)
+        {
+        }
+        *USART1_DR = temp & 0xFF;
+    }
+
+#endif
 
 #if use_RTOS
     // 打开中断
@@ -277,4 +296,100 @@ static void HEX_TO_STR(uint8_t data, char *str)
     }
 }
 
-// 单元测试
+// 串口硬件初始化
+static void uart_hardware_init()
+{
+    // 系统时钟HCLK
+    extern uint32_t SystemCoreClock;
+
+    // PCK2 倍频倍数
+    uint8_t APBPrescTable[8U] = {0, 0, 0, 0, 1, 2, 3, 4};
+
+    uint32_t temp = 0;
+    // USARTDIV的整数部分
+    uint32_t DIV_Mantissa = 0;
+    // USARTDIV的小数部分
+    uint32_t DIV_Fraction = 0;
+    // RCC_BASS
+    uint32_t RCC_BASE1 = 0x40021000;
+    // RCC_APB2ENR 时钟
+    volatile uint32_t *RCC_APB2ENR = (uint32_t *)(RCC_BASE1 + 0x18);
+    // RCC 时钟配置寄存器
+    volatile uint32_t *RCC_CFGR = (uint32_t *)(RCC_BASE1 + 0x04);
+
+    // GPIOA 端口配置寄存器
+    volatile uint32_t *GPIOA_CRH = (uint32_t *)(0x40010800 + 0x04);
+
+    // USART1 寄存器基地址
+    uint32_t USART1_BASS = 0x40013800;
+
+    // USART1 波特比率寄存器
+    volatile uint32_t *USART1_BRR = (uint32_t *)(USART1_BASS + 0x08);
+    // USART1 CR1寄存器
+    volatile uint32_t *USART1_CR1 = (uint32_t *)(USART1_BASS + 0x0C);
+    // USART1 CR2寄存器
+    volatile uint32_t *USART1_CR2 = (uint32_t *)(USART1_BASS + 0x10);
+    // USART1 CR3寄存器
+    volatile uint32_t *USART1_CR3 = (uint32_t *)(USART1_BASS + 0x14);
+    /* 启用时钟 */
+
+    // 启用USART1时钟
+    *RCC_APB2ENR |= (1U << 14);
+
+    // 启用GPIO A时钟
+    *RCC_APB2ENR |= (1U << 2);
+
+    /* 配置gpio pin (确保GPIOA_CRH = 0x4bX)*/
+
+    // 清除GPIO A9的配置位 bit4:7
+    *GPIOA_CRH &= 0xFFFFFF0F;
+
+    // 配置GPIO A9 输出模式为复用推挽输出(bit6:7)和输出速度为高(bit4:5)
+    *GPIOA_CRH |= (3U << 4) | (2U << 6);
+
+    // 清除GPIO A10的配置位 bit8:11
+    *GPIOA_CRH &= 0xFFFFF0FF;
+
+    // 配置GPIO A10 输出模式为浮空输入(bit10:11)和输入模式(bit8:9)
+    *GPIOA_CRH |= (1U << 10);
+
+    /*配置串口参数*/
+
+    // 配置字长bit12、校验使能bit9、奇偶校验bit8、接受使能bit3、发送使能bit2
+    // 清除位
+    *USART1_CR1 &= (~((1U << 12) | (1U << 9) | (1 << 8) | (1 << 3) | (1 << 2)));
+
+    // 配置位 bit2、3为1，其他位为0
+    *USART1_CR1 |= ((1U << 2) | (1U << 3));
+
+    // 配置字长(bit12:13) 一个停止位、禁用LIN模式bit14、禁用CLKEN bit11
+    // 清除位
+    *USART1_CR2 &= (~(3U << 12) | (1U << 11) | (1U << 14));
+
+    // 配置禁用红外模式、半双工模式、智能卡模式
+    // 清除位
+    *USART1_CR3 &= (~(3U << 1) | (1U << 3) | (1U << 5));
+
+    // 配置 USART_BRR寄存器 USART1时钟源PCLK2,先获取到PCLK2的分频率数
+    temp = (*RCC_CFGR & (7U << 11)) >> 11;         // 分频倍数
+    temp = SystemCoreClock >> APBPrescTable[temp]; // PCLK2 频率
+
+    // 波特率计算公式 ：baud = fck/(16 * USARTDIV )，USARTDIV =fck / ( 16 * baud )
+
+    // 计算整数部分， 将PCLK2 放大100倍数(HAL库)，用于提高精度
+    DIV_Mantissa = (((temp * 25U) / (4U * 115200U)) / 100U);
+    // 小数部分 *16是为了将小数转换成二进制数 加50是补偿(手动四舍五入)
+    DIV_Fraction = ((((temp * 25U) / (4U * 115200U)) - DIV_Mantissa * 100U) * 16U + 50U) / 100U;
+    *USART1_BRR = (DIV_Mantissa << 4) + DIV_Fraction;
+
+#if uart_IT
+
+    // 设置USART1 中断优先级 nvic 偏移值0x0000_00D4
+    NVIC_SetPriority(37, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0, 0));
+
+    // 启用中断
+    NVIC_EnableIRQ(37);
+#endif
+    // 使能USART1
+    *USART1_CR1 |= (1U << 13);
+}

@@ -6,8 +6,10 @@ typedef unsigned short uint16_t;
 
 #define MIN(a, b) ((a < b) ? a : b)
 
+#define BIT2 1U << 2
 #define BIT6 1U << 6
 #define BIT7 1U << 7
+#define BIT14 1U << 14
 
 // 使用中断进行输出
 #define uart_IT 1
@@ -20,7 +22,10 @@ typedef unsigned short uint16_t;
 #include "FreeRTOS.h"
 #endif
 
+#if uart_IT
 #include "stm32f103xb.h"
+#endif
+
 #define FIFO_LOG_LEN 1024
 
 typedef enum
@@ -60,11 +65,20 @@ typedef struct
 
 /******************Macro definition function************/
 
-#define UART_RCC_INIT() \
-    do                  \
-    {                   \
-        /* code */      \
+// 打开UART1 RCC时钟
+#define UART_RCC_INIT()         \
+    do                          \
+    {                           \
+        RCC->APB2ENR |= (BIT14) \
     } while (0)
+
+// 设置GPIOA启用
+#define UART_GPIO_RCC_INIT()   \
+    do                         \
+    {                          \
+        RCC->APB2ENR |= (BIT2) \
+    } while (0);
+
 // 打开移位寄存器非空中断
 #define ENABLE_UART_TX_DR_IT()            \
     do                                    \
