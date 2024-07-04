@@ -3,13 +3,9 @@
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
+//typedef unsigned int uint32_t;
 
 #define MIN(a, b) ((a < b) ? a : b)
-
-#define BIT2 1U << 2
-#define BIT6 1U << 6
-#define BIT7 1U << 7
-#define BIT14 1U << 14
 
 // 使用中断进行输出
 #define uart_IT 1
@@ -17,7 +13,6 @@ typedef unsigned short uint16_t;
 // 使用RTOS
 #define use_RTOS 1
 
-#define uart_test 0
 #if use_RTOS
 #include "FreeRTOS.h"
 #endif
@@ -25,6 +20,8 @@ typedef unsigned short uint16_t;
 #if uart_IT
 #include "stm32f103xb.h"
 #endif
+
+
 
 #define FIFO_LOG_LEN 1024
 
@@ -65,53 +62,6 @@ typedef struct
 
 /******************Macro definition function************/
 
-// 打开UART1 RCC时钟
-#define UART_RCC_INIT()         \
-    do                          \
-    {                           \
-        RCC->APB2ENR |= (BIT14) \
-    } while (0)
-
-// 设置GPIOA启用
-#define UART_GPIO_RCC_INIT()   \
-    do                         \
-    {                          \
-        RCC->APB2ENR |= (BIT2) \
-    } while (0);
-
-// 打开移位寄存器非空中断
-#define ENABLE_UART_TX_DR_IT()            \
-    do                                    \
-    {                                     \
-        USART1->CR1 |= ((BIT7) & 0xFFFF); \
-    } while (0)
-// 禁用移位寄存器非空中断
-#define DISABLE_UART_TX_DR_IT()            \
-    do                                     \
-    {                                      \
-        USART1->CR1 &= ~((BIT7) & 0xFFFF); \
-    } while (0)
-
-// 设置传输完成中断
-#define ENABLE_UART_TX_TC_IT()            \
-    do                                    \
-    {                                     \
-        USART1->CR1 |= ((BIT6) & 0xFFFF); \
-    } while (0)
-
-// 禁用传输完成中断
-#define DISABLE_UART_TX_TC_IT()            \
-    do                                     \
-    {                                      \
-        USART1->CR1 &= ~((BIT6) & 0xFFFF); \
-    } while (0)
-
-// 发送数据到UART移位寄存器
-#define UART_SEND_DATA_DR(data)     \
-    do                              \
-    {                               \
-        USART1->DR = (data & 0xFF); \
-    } while (0)
 #define UART_ASSERT(x) \
     if ((x) == 0)      \
     {                  \

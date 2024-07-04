@@ -80,7 +80,6 @@ int main(void)
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
-
   /* Configure the system clock */
   SystemClock_Config();
 
@@ -90,10 +89,9 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  //MX_DMA_Init();
-  MX_USART1_UART_Init();
+  // MX_DMA_Init();
+  // MX_USART1_UART_Init();//自己已经实现
   /* USER CODE BEGIN 2 */
-
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -111,8 +109,9 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-    uart_printf("test test test test\r\n",NULL,0);
-    HAL_Delay(1);
+    uint8_t test[2] = {0xac,0x12};
+    uart_printf("test test test test", test, 2);
+    HAL_Delay(1000);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */

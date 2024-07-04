@@ -1,6 +1,6 @@
 #include "uart_printf.h"
 #include "string.h"
-#include "usart.h"
+// #include "usart.h"
 #include "stdio.h"
 #include "stdlib.h"
 
@@ -8,6 +8,43 @@
 static uint8_t initUartPrintf = 0;
 // fifo的句柄
 static HANDLE_LOG_FIFO log_fifo_handle;
+
+// RCC_BASS
+const uint32_t RCC_BASE1 = 0x40021000;
+// RCC_APB2ENR 时钟
+static volatile uint32_t *RCC_APB2ENR = (uint32_t *)(RCC_BASE1 + 0x18);
+// RCC 时钟配置寄存器
+static volatile uint32_t *RCC_CFGR = (uint32_t *)(RCC_BASE1 + 0x04);
+
+// GPIOA 端口配置寄存器
+static volatile uint32_t *GPIOA_CRH = (uint32_t *)(0x40010800 + 0x04);
+
+// USART1 寄存器基地址
+const uint32_t USART1_BASS = 0x40013800;
+
+#if !uart_IT
+// USART1_SR寄存器
+static volatile uint32_t *USART1_SR = (uint32_t *)0x40013800;
+#endif
+
+// USART1_DR寄存器
+static volatile uint32_t *USART1_DR = (uint32_t *)(USART1_BASS + 0x04);
+// USART1 波特比率寄存器
+static volatile uint32_t *USART1_BRR = (uint32_t *)(USART1_BASS + 0x08);
+// USART1 CR1寄存器
+static volatile uint32_t *USART1_CR1 = (uint32_t *)(USART1_BASS + 0x0C);
+// USART1 CR2寄存器
+static volatile uint32_t *USART1_CR2 = (uint32_t *)(USART1_BASS + 0x10);
+// USART1 CR3寄存器
+static volatile uint32_t *USART1_CR3 = (uint32_t *)(USART1_BASS + 0x14);
+
+
+// 将data写到DR寄存器
+#define UART_SEND_DATA_DR(data) *USART1_DR = (data & 0xFF)
+// 禁用DR寄存器空中断
+#define DISABLE_UART_TX_DR_IT() *USART1_CR1 &= ~(1U << 7)
+// 启用DR寄存器空中断
+#define ENABLE_UART_TX_DR_IT() *USART1_CR1 |= (1U << 7)
 
 // 写数据到fifo
 static uint8_t uart_fifo_put(const void *data, const uint16_t dataLen);
@@ -233,10 +270,7 @@ uint8_t uart_printf(const void *strData, const uint8_t *data, const uint8_t len)
         log_fifo_handle.uart_error_code = UART_TX_BUSY;
     }
 #else
-    // USART1_SR寄存器
-    uint32_t *USART1_SR = (uint32_t *)0x40013800;
-    // USART1_DR寄存器
-    uint32_t *USART1_DR = (uint32_t *)0x40013804;
+
     uint8_t temp = 0;
     while (uart_fifo_get(&temp, 1) != FIFO_OUT_FAIL)
     {
@@ -310,27 +344,7 @@ static void uart_hardware_init()
     uint32_t DIV_Mantissa = 0;
     // USARTDIV的小数部分
     uint32_t DIV_Fraction = 0;
-    // RCC_BASS
-    uint32_t RCC_BASE1 = 0x40021000;
-    // RCC_APB2ENR 时钟
-    volatile uint32_t *RCC_APB2ENR = (uint32_t *)(RCC_BASE1 + 0x18);
-    // RCC 时钟配置寄存器
-    volatile uint32_t *RCC_CFGR = (uint32_t *)(RCC_BASE1 + 0x04);
 
-    // GPIOA 端口配置寄存器
-    volatile uint32_t *GPIOA_CRH = (uint32_t *)(0x40010800 + 0x04);
-
-    // USART1 寄存器基地址
-    uint32_t USART1_BASS = 0x40013800;
-
-    // USART1 波特比率寄存器
-    volatile uint32_t *USART1_BRR = (uint32_t *)(USART1_BASS + 0x08);
-    // USART1 CR1寄存器
-    volatile uint32_t *USART1_CR1 = (uint32_t *)(USART1_BASS + 0x0C);
-    // USART1 CR2寄存器
-    volatile uint32_t *USART1_CR2 = (uint32_t *)(USART1_BASS + 0x10);
-    // USART1 CR3寄存器
-    volatile uint32_t *USART1_CR3 = (uint32_t *)(USART1_BASS + 0x14);
     /* 启用时钟 */
 
     // 启用USART1时钟
